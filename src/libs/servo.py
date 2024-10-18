@@ -1,5 +1,6 @@
 from machine import PWM
 from time import sleep_us
+from .utils import clamp
 
 servo_pin = 11
 
@@ -9,18 +10,7 @@ freq_hz = 1000 // (period_ns // 1_000_000)
 min_duty_ns = 500_000   # represents angle 0
 max_duty_ns = 2_700_000 # represents angle 180
 
-pwm = PWM(servo_pin, freq=freq_hz, duty_ns=period_ns) # 19500000
-
-def attach() -> None:
-    global pwm
-    pwm.init()
-
-def dettach() -> None:
-    global pwm
-    pwm.deinit()
-
-def clamp(n: int | float, smallest: int | float, biggest: int | float) -> int | float:
-    return smallest if n < smallest else biggest if n > biggest else n
+pwm = PWM(servo_pin, freq=freq_hz, duty_ns=period_ns)
 
 def perc_to_duty_ns(perc: float) -> int:
     # Takes in a value in the range [0,1] that represents an
@@ -35,7 +25,17 @@ def perc_to_duty_ns(perc: float) -> int:
     return period_ns - non_inv_ns
 
 pwm_init_flag = False
-curr_ns = perc_to_duty_ns(0.5)
+curr_ns = perc_to_duty_ns(0)
+
+def attach() -> None:
+    global pwm, pwm_init_flag
+    pwm.init()
+    pwm_init_flag = True
+
+def dettach() -> None:
+    global pwm, pwm_init_flag
+    pwm.deinit()
+    pwm_init_flag = False
 
 def set_angle(perc: float) -> None:
     global pwm, curr_ns, pwm_init_flag
@@ -52,8 +52,7 @@ def set_angle_slow_blocking(perc: int | float, delay_us: int=5_000, step: int=5_
     if final_ns == curr_ns: return
     direction = int(final_ns > curr_ns) * 2 - 1 # 1 or -1
     if not pwm_init_flag:
-        pwm.init()
-        pwm_init_flag = True
+        attach()
     for ns in range(curr_ns, final_ns+direction, step*direction):
         pwm.duty_ns(ns)
         sleep_us(delay_us)
@@ -69,8 +68,7 @@ async def set_angle_slow_async(perc: int | float, delay_ms: int=5, step: int=5_0
     if final_ns == curr_ns: return
     direction = int(final_ns > curr_ns) * 2 - 1 # 1 or -1
     if not pwm_init_flag:
-        pwm.init()
-        pwm_init_flag = True
+        attach()
     for ns in range(curr_ns, final_ns+direction, step*direction):
         pwm.duty_ns(ns)
         await asyncio.sleep_ms(delay_ms)
