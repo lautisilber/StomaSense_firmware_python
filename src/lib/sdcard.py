@@ -24,6 +24,7 @@ Example usage on ESP8266:
 """
 
 from micropython import const
+from machine import SPI, Pin
 import time
 
 
@@ -42,9 +43,10 @@ _TOKEN_DATA = const(0xFE)
 
 
 class SDCard:
-    def __init__(self, spi, cs, baudrate=1320000):
+    def __init__(self, spi: SPI, cs: Pin, init_card: bool, baudrate: int=1320000):
         self.spi = spi
         self.cs = cs
+        self.baudrate = baudrate
 
         self.cmdbuf = bytearray(6)
         self.dummybuf = bytearray(512)
@@ -54,9 +56,12 @@ class SDCard:
         self.dummybuf_memoryview = memoryview(self.dummybuf)
 
         # initialise the card
-        self.init_card(baudrate)
+        if init_card:
+            self.init_card()
 
-    def init_spi(self, baudrate):
+    def init_spi(self, baudrate: int | None=None):
+        if baudrate is None:
+            baudrate = self.baudrate
         try:
             master = self.spi.MASTER
         except AttributeError:
@@ -66,7 +71,10 @@ class SDCard:
             # on pyboard
             self.spi.init(master, baudrate=baudrate, phase=0, polarity=0)
 
-    def init_card(self, baudrate):
+    def init_card(self, baudrate: int | None=None):
+        if baudrate is None:
+            baudrate = self.baudrate
+
         # init CS pin
         self.cs.init(self.cs.OUT, value=1)
 
